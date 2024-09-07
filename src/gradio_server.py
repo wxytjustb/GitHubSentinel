@@ -21,21 +21,60 @@ def export_progress_by_date_range(repo, days):
 
     return report, report_file_path  # 返回报告内容和报告文件路径
 
-# 创建Gradio界面
-demo = gr.Interface(
-    fn=export_progress_by_date_range,  # 指定界面调用的函数
-    title="GitHubSentinel",  # 设置界面标题
-    inputs=[
-        gr.Dropdown(
-            subscription_manager.list_subscriptions(), label="订阅列表", info="已订阅GitHub项目"
-        ),  # 下拉菜单选择订阅的GitHub项目
-        gr.Slider(value=2, minimum=1, maximum=7, step=1, label="报告周期", info="生成项目过去一段时间进展，单位：天"),
-        # 滑动条选择报告的时间范围
-    ],
-    outputs=[gr.Markdown(), gr.File(label="下载报告")],  # 输出格式：Markdown文本和文件下载
-)
+
+
+with gr.Blocks() as demo:
+    gr.Markdown("# GitHubSentinel")  # 界面标题
+
+    with gr.Row():
+        new_subscription_input = gr.Textbox(label="添加新的订阅", placeholder="输入新的 GitHub 项目名称")
+        add_subscription_button = gr.Button("添加订阅")
+
+    with gr.Row():
+        choices = subscription_manager.list_subscriptions()
+        subscription_dropdown = gr.Dropdown(
+            choices,
+            value=choices[0],
+            label="订阅列表",
+            info="已订阅GitHub项目"
+        )
+
+
+        report_period_slider = gr.Slider(
+            value=2,
+            minimum=1,
+            maximum=7,
+            step=1,
+            label="报告周期",
+            info="生成项目过去一段时间进展，单位：天"
+        )
+
+    output_markdown = gr.Markdown(label="报告内容")
+    output_file = gr.File(label="下载报告")
+
+
+    def on_add_subscription_click(new_subscription):
+        subscription_manager.add_subscription(new_subscription)
+        updated_subscriptions = subscription_manager.list_subscriptions()
+        subscription_dropdown.choices = [(item, item) for item in updated_subscriptions]
+        subscription_dropdown.value = new_subscription
+        return subscription_dropdown
+
+
+    add_subscription_button.click(
+        fn=on_add_subscription_click,
+        inputs=[new_subscription_input],
+        outputs=subscription_dropdown,
+    )
+
+    gr.Button("生成报告").click(
+        export_progress_by_date_range,
+        inputs=[subscription_dropdown, report_period_slider],
+        outputs=[output_markdown, output_file],
+    )
+
 
 if __name__ == "__main__":
-    demo.launch(share=True, server_name="0.0.0.0")  # 启动界面并设置为公共可访问
+    demo.launch(share=False, server_name="0.0.0.0")  # 启动界面并设置为公共可访问
     # 可选带有用户认证的启动方式
     # demo.launch(share=True, server_name="0.0.0.0", auth=("django", "1234"))
